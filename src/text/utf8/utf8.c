@@ -139,7 +139,11 @@ int utf8_icmp(const char* s1, size_t n1, const char* s2, size_t n2) {
         if (c || !s2[j2 - 1])  // OK if n1 and n2 are npos
             return (int)c;
     }
-    return (int)(n1 - n2);
+    // the string whose codepoints ran out first is the smaller one.
+    // byte lengths cannot decide this: a casefold may change the encoded
+    // width (ſ is two bytes but folds to the one-byte s), so equal decoded
+    // streams can have unequal byte lengths
+    return (j1 < n1) - (j2 < n2);
 }
 
 // utf8_valid returns true if s is a valid utf8 string.

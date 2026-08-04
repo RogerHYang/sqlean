@@ -489,3 +489,12 @@ select '29_09', text_like('прив_т', 'пРиВеТ') = 1;
 select '31_01', (select 1 where 'hello' = 'hello' collate text_nocase) = 1;
 select '31_02', (select 1 where 'hell0' = 'hello' collate text_nocase) is null;
 select '31_03', (select 1 where 'привет' = 'ПРИВЕТ' collate text_nocase) = 1;
+-- casefolding may change the encoded width: ſ folds to s, K (the kelvin
+-- sign, char(8490)) folds to k. equal folded strings must compare equal
+select '31_04', (select 1 where 'ſ' = 's' collate text_nocase) = 1;
+select '31_05', (select 1 where char(8490) = 'k' collate text_nocase) = 1;
+-- and the order must stay total: ſx < sxx < sxy
+select '31_06', (select 1 where 'ſx' = 'sxy' collate text_nocase) is null;
+select '31_07', (select 1 where 'ſx' < 'sxx' collate text_nocase) = 1;
+select '31_08', (select 1 where 'sxx' < 'sxy' collate text_nocase) = 1;
+select '31_09', (select 1 where 's' < 'ſx' collate text_nocase) = 1;

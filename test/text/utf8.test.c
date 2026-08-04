@@ -66,6 +66,36 @@ static void test_icmp(void) {
         const char* s2 = "HELLO, 世界!";
         assert(utf8_icmp(s1, strlen(s1), s2, strlen(s2)) < 0);
     }
+    // a casefold may change the encoded width: ſ (two bytes) folds to
+    // s (one byte), K (U+212A, three bytes) folds to k. the comparison
+    // is over decoded folded codepoints, not bytes
+    {
+        const char* s1 = "ſ";
+        const char* s2 = "s";
+        assert(utf8_icmp(s1, strlen(s1), s2, strlen(s2)) == 0);
+    }
+    {
+        const char* s1 = "\xe2\x84\xaa";  // K, the kelvin sign
+        const char* s2 = "k";
+        assert(utf8_icmp(s1, strlen(s1), s2, strlen(s2)) == 0);
+    }
+    // the order must be total: ſx < sxx < sxy, transitively.
+    // comparing byte lengths made ſx "equal" to both sxx and sxy
+    {
+        const char* a = "ſx";
+        const char* b = "sxx";
+        const char* c = "sxy";
+        assert(utf8_icmp(a, strlen(a), b, strlen(b)) < 0);
+        assert(utf8_icmp(b, strlen(b), c, strlen(c)) < 0);
+        assert(utf8_icmp(a, strlen(a), c, strlen(c)) < 0);
+    }
+    // a string that folds to a prefix of the other is the smaller one
+    {
+        const char* s1 = "s";
+        const char* s2 = "ſx";
+        assert(utf8_icmp(s1, strlen(s1), s2, strlen(s2)) < 0);
+        assert(utf8_icmp(s2, strlen(s2), s1, strlen(s1)) > 0);
+    }
     printf("OK\n");
 }
 
