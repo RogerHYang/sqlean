@@ -14,33 +14,6 @@
 #include "text/runes.h"
 #include "text/utf8/rune.h"
 
-// utf8_length returns the number of utf-8 characters in a string.
-static size_t utf8_length(const char* str) {
-    size_t length = 0;
-
-    while (*str != '\0') {
-        if (0xf0 == (0xf8 & *str)) {
-            // 4-byte utf8 code point (began with 0b11110xxx)
-            str += 4;
-        } else if (0xe0 == (0xf0 & *str)) {
-            // 3-byte utf8 code point (began with 0b1110xxxx)
-            str += 3;
-        } else if (0xc0 == (0xe0 & *str)) {
-            // 2-byte utf8 code point (began with 0b110xxxxx)
-            str += 2;
-        } else {  // if (0x00 == (0x80 & *s)) {
-            // 1-byte ascii (began with 0b0xxxxxxx)
-            str += 1;
-        }
-
-        // no matter the bytes we marched s forward by, it was
-        // only 1 utf8 codepoint
-        length++;
-    }
-
-    return length;
-}
-
 // rstring_new creates an empty string.
 RuneString rstring_new(void) {
     RuneString str = {.runes = NULL, .length = 0, .size = 0, .owning = true};
@@ -57,9 +30,16 @@ static RuneString rstring_from_runes(const int32_t* const runes, size_t length, 
 
 // rstring_from_cstring creates a new string from a zero-terminated C string.
 RuneString rstring_from_cstring(const char* const utf8str) {
-    size_t length = utf8_length(utf8str);
-    int32_t* runes = length > 0 ? runes_from_cstring(utf8str, length) : NULL;
-    return rstring_from_runes(runes, length, true);
+    size_t n = strlen(utf8str);
+    if (n == 0) {
+        return rstring_new();
+    }
+    size_t count = 0;
+    int32_t* runes = runes_from_cstring(utf8str, n, &count);
+    if (runes == NULL) {
+        return rstring_new();
+    }
+    return rstring_from_runes(runes, count, true);
 }
 
 // rstring_to_cstring converts the string to a zero-terminated C string.

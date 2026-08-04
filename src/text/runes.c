@@ -11,25 +11,33 @@
 #include "text/runes.h"
 #include "text/utf8/utf8.h"
 
-// runes_from_cstring creates an array of runes from a C string.
-int32_t* runes_from_cstring(const char* const str, size_t length) {
-    assert(length > 0);
-    int32_t* runes = calloc(length, sizeof(int32_t));
+// runes_from_cstring creates an array of runes from a C string of n bytes,
+// storing the number of runes in count. Invalid utf8 decodes as U+FFFD
+// (one per maximal ill-formed subpart) rather than being dropped, so the
+// runes always represent every input byte, and the rune count always agrees
+// with the array's contents.
+int32_t* runes_from_cstring(const char* const str, size_t n, size_t* count) {
+    assert(n > 0);
+    // one rune per byte is the worst case (ascii, or U+FFFD substitutions)
+    int32_t* runes = malloc(n * sizeof(int32_t));
     if (runes == NULL) {
+        *count = 0;
         return NULL;
     }
 
-    utf8_decode_t d = {.state = 0};
-    const char* s = str;
-    size_t idx = 0;
-    while (idx < length && *s != 0) {
-        do {
-            utf8_decode(&d, (uint8_t)*s++);
-        } while (d.state);
-        runes[idx] = d.codep;
-        idx += 1;
+    size_t i = 0, idx = 0;
+    while (i < n) {
+        runes[idx++] = (int32_t)utf8_next(str, n, &i);
     }
+    *count = idx;
 
+    if (idx < n) {
+        // shrink to real size
+        int32_t* shrunk = realloc(runes, idx * sizeof(int32_t));
+        if (shrunk != NULL) {
+            runes = shrunk;
+        }
+    }
     return runes;
 }
 

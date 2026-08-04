@@ -28,6 +28,45 @@ static void test_cstring(void) {
     printf("OK\n");
 }
 
+// An invalid or truncated utf8 sequence must not send the decoder past the
+// end of the string. It decodes as U+FFFD (one per maximal ill-formed
+// subpart), and the bytes around it survive. Each input is copied into an
+// exact-sized allocation so that a sanitizer build catches any overrun.
+static void test_cstring_invalid(void) {
+    printf("test_cstring_invalid...");
+    static const struct {
+        const char* input;
+        const int32_t runes[4];
+        size_t length;
+    } tests[] = {
+        {"\xc3", {0xFFFD}, 1},                    // truncated 2-byte sequence
+        {"\xe4\xb8", {0xFFFD}, 1},                // truncated 3-byte sequence
+        {"\xf0\x90\x8d", {0xFFFD}, 1},            // truncated 4-byte sequence
+        {"\x80", {0xFFFD}, 1},                    // stray continuation byte
+        {"\xff", {0xFFFD}, 1},                    // byte that can start nothing
+        {"a\xc3", {'a', 0xFFFD}, 2},              // truncation is not contagious...
+        {"\xc3" "a", {0xFFFD, 'a'}, 2},           // ...in either direction
+        {"a\xff" "b", {'a', 0xFFFD, 'b'}, 3},     // and neither is a bad byte
+        {"\x80\x80", {0xFFFD, 0xFFFD}, 2},        // one U+FFFD per bad byte
+        {"a\xe4\xb8" "b", {'a', 0xFFFD, 'b'}, 3}, // one per maximal subpart
+    };
+    for (size_t i = 0; i < sizeof(tests) / sizeof(*tests); i++) {
+        size_t n = strlen(tests[i].input);
+        char* s = malloc(n + 1);
+        assert(s != NULL);
+        memcpy(s, tests[i].input, n);
+        s[n] = '\0';
+        RuneString str = rstring_from_cstring(s);
+        assert(str.length == tests[i].length);
+        for (size_t j = 0; j < str.length; j++) {
+            assert(str.runes[j] == tests[i].runes[j]);
+        }
+        rstring_free(str);
+        free(s);
+    }
+    printf("OK\n");
+}
+
 static void test_at(void) {
     printf("test_at...");
     RuneString str = rstring_from_cstring("привет мир");
@@ -933,6 +972,7 @@ static void test_like(void) {
 
 int main(void) {
     test_cstring();
+    test_cstring_invalid();
     test_at();
     test_slice();
     test_substring();

@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-int32_t* runes_from_cstring(const char* const str, size_t length);
+int32_t* runes_from_cstring(const char* const str, size_t n, size_t* count);
 char* runes_to_cstring(const int32_t* runes, size_t length);
 
 #endif /* RUNES_H */

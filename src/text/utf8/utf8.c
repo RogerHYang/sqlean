@@ -110,32 +110,65 @@ size_t utf8_len(const char* s, size_t n) {
     return size;
 }
 
+// UTF8_REJECT is the decoder state after a byte that cannot appear in a valid
+// utf8 sequence at that position. The reject state is sticky: feeding the
+// decoder more bytes never gets it out, so a loop waiting for the accept
+// state must treat it as final.
+#define UTF8_REJECT 12
+
+// utf8_next decodes the codepoint starting at byte *i of s, which has n bytes,
+// and advances *i past it. It never reads past the n bytes, and *i always
+// advances, so a loop over utf8_next visits every byte exactly once.
+// An invalid or truncated sequence decodes as U+FFFD, the replacement
+// character, one per maximal ill-formed subpart: the bytes that form a valid
+// prefix collapse into a single U+FFFD, and the byte that broke the sequence
+// is left for the next call, since it may well start a valid one.
+uint32_t utf8_next(const char* s, size_t n, size_t* i) {
+    if (*i >= n) {
+        return 0;
+    }
+    const size_t start = *i;
+    utf8_decode_t d = {.state = 0};
+    uint32_t state;
+    do {
+        state = utf8_decode(&d, (uint8_t)s[(*i)++]);
+    } while (state != 0 && state != UTF8_REJECT && *i < n);
+    if (state == 0) {
+        return d.codep;
+    }
+    if (state == UTF8_REJECT && *i - start > 1) {
+        // the last byte broke a sequence it was never part of:
+        // give it back so the next call can try it as a sequence start
+        (*i)--;
+    }
+    return 0xFFFD;
+}
+
 // utf8_peek returns the utf8 codepoint at the start of s.
 uint32_t utf8_peek(const char* s) {
-    utf8_decode_t d = {.state = 0};
-    do {
-        utf8_decode(&d, (uint8_t)*s++);
-    } while (d.state);
-    return d.codep;
+    // a utf8 sequence is at most 4 bytes, so that is all we need of s
+    size_t i = 0;
+    return utf8_next(s, strnlen(s, 4), &i);
 }
 
 // utf8_peek_at returns the utf8 codepoint at the index pos from s.
 uint32_t utf8_peek_at(const char* s, size_t n, size_t pos) {
-    return utf8_peek(utf8_at(s, n, pos));
+    // scan with utf8_next, not utf8_at/utf8_peek: those assume a
+    // nul-terminated string, while here s is bounded by n alone
+    size_t i = 0;
+    while (pos-- > 0 && i < n) {
+        utf8_next(s, n, &i);
+    }
+    return utf8_next(s, n, &i);
 }
 
 // utf8_icmp compares the utf8 strings s1 and s2 case-insensitively.
 int utf8_icmp(const char* s1, size_t n1, const char* s2, size_t n2) {
-    utf8_decode_t d1 = {.state = 0}, d2 = {.state = 0};
     size_t j1 = 0, j2 = 0;
     while ((j1 < n1) & (j2 < n2)) {
-        do {
-            utf8_decode(&d1, (uint8_t)s1[j1++]);
-        } while (d1.state);
-        do {
-            utf8_decode(&d2, (uint8_t)s2[j2++]);
-        } while (d2.state);
-        int32_t c = (int32_t)rune_casefold(d1.codep) - (int32_t)rune_casefold(d2.codep);
+        uint32_t c1 = utf8_next(s1, n1, &j1);
+        uint32_t c2 = utf8_next(s2, n2, &j2);
+        int32_t c = (int32_t)rune_casefold(c1) - (int32_t)rune_casefold(c2);
         if (c || !s2[j2 - 1])  // OK if n1 and n2 are npos
             return (int)c;
     }

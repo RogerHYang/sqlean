@@ -498,3 +498,30 @@ select '31_06', (select 1 where 'ſx' = 'sxy' collate text_nocase) is null;
 select '31_07', (select 1 where 'ſx' < 'sxx' collate text_nocase) = 1;
 select '31_08', (select 1 where 'sxx' < 'sxy' collate text_nocase) = 1;
 select '31_09', (select 1 where 's' < 'ſx' collate text_nocase) = 1;
+
+-- invalid utf8 must not send the decoder past the end of the string.
+-- each maximal ill-formed subpart decodes as U+FFFD = char(65533)
+-- (x'80' is a stray continuation byte, x'c3' a truncated 2-byte sequence)
+select '32_01', text_length(cast(x'80' as text)) = 1;
+select '32_02', text_length(cast(x'c3' as text)) = 1;
+select '32_03', text_length(cast(x'e4b8' as text)) = 1;
+select '32_04', text_length(cast(x'41ff42' as text)) = 3;
+select '32_05', text_index(cast(x'80' as text), 'a') = 0;
+select '32_06', text_substring(cast(x'c3' as text), 1, 1) = char(65533);
+select '32_07', hex(text_reverse(cast(x'41ff42' as text))) = '42EFBFBD41';
+select '32_08', text_trim(cast(x'e4b8' as text)) = char(65533);
+select '32_09', text_left(cast(x'ff' as text), 1) = char(65533);
+-- the bytes after an invalid sequence are still part of the value
+select '32_10', text_index(cast(x'41ff42' as text), 'B') = 3;
+select '32_11', text_length(cast(x'c341' as text)) = 2;
+-- valid utf8 must count exactly as before
+select '32_12', text_length('Hello, 世界!') = 10;
+select '32_13', text_length('привет') = 6;
+select '32_14', text_substring('世界abc', 1, 2) = '世界';
+
+-- the nocase collation must not walk past the end of invalid utf8 either
+select '33_01', (select 1 where cast(x'80' as text) = cast(x'80' as text) collate text_nocase) = 1;
+select '33_02', (select 1 where cast(x'80' as text) = 'a' collate text_nocase) is null;
+select '33_03', (select 1 where cast(x'41ff42' as text) = cast(x'61ff62' as text) collate text_nocase) = 1;
+-- both decode to a single U+FFFD, so they compare equal
+select '33_04', (select 1 where cast(x'e4b8' as text) = cast(x'ff' as text) collate text_nocase) = 1;
