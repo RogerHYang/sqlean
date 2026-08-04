@@ -28,12 +28,6 @@ static bool utf8_put(char* dst, size_t dstcap, size_t* out, uint32_t c) {
 // function, writing the result to dst and its byte length to dstlen.
 // ctx carries state between characters for transforms that need it.
 //
-// Case conversion can change how many bytes a character occupies
-// (İ U+0130 lowercases to i, 2 bytes to 1; Ⱥ U+023A lowercases to ⱥ, 2 to 3),
-// so it cannot be done in place: dst must be a separate buffer with room for
-// at least n*2 + 1 bytes. Case mappings expand a character by at most half
-// (2 bytes to 3), so that is always enough.
-//
 // Returns false if src is not valid utf8 or the result does not fit in dst.
 static bool utf8_transform(const char* src,
                            size_t n,
