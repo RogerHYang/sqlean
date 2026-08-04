@@ -21,13 +21,7 @@ uint32_t utf8_decode(utf8_decode_t* d, const uint32_t byte);
 // and returns the number of bytes written.
 int utf8_encode(char* out, uint32_t c);
 
-// utf8_next decodes the codepoint starting at byte *i of s, which has n bytes,
-// and advances *i past it. It never reads past the n bytes, and *i always
-// advances, so a loop over utf8_next visits every byte exactly once.
-// An invalid or truncated sequence decodes as U+FFFD, the replacement
-// character, one per maximal ill-formed subpart: the bytes that form a valid
-// prefix collapse into a single U+FFFD, and the byte that broke the sequence
-// is left for the next call, since it may well start a valid one.
+// utf8_next decodes the next codepoint and advances the byte index.
 uint32_t utf8_next(const char* s, size_t n, size_t* i);
 
 // utf8_len returns the number of utf8 codepoints in s.

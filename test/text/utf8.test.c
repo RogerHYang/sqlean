@@ -127,11 +127,11 @@ static void test_next(void) {
         const uint32_t runes[4];
         size_t count;
     } tests[] = {
-        {"a\xd0\xb1" "c", {'a', 0x0431, 'c'}, 3},// valid
-        {"\xc3", {0xFFFD}, 1},                   // truncated at the end
-        {"a\xe4\xb8" "b", {'a', 0xFFFD, 'b'}, 3},// truncated in the middle
-        {"\x80\x80", {0xFFFD, 0xFFFD}, 2},       // stray continuation bytes
-        {"\xc3" "a", {0xFFFD, 'a'}, 2},          // the breaking byte survives
+        {"a\xd0\xb1" "c", {'a', 0x0431, 'c'}, 3},  // valid
+        {"\xc3", {0xFFFD}, 1},                     // truncated at the end
+        {"a\xe4\xb8" "b", {'a', 0xFFFD, 'b'}, 3},  // truncated in the middle
+        {"\x80\x80", {0xFFFD, 0xFFFD}, 2},         // stray continuation bytes
+        {"\xc3" "a", {0xFFFD, 'a'}, 2},            // the breaking byte survives
     };
     for (size_t t = 0; t < sizeof(tests) / sizeof(*tests); t++) {
         size_t n = strlen(tests[t].input);

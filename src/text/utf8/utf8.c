@@ -153,8 +153,6 @@ uint32_t utf8_peek(const char* s) {
 
 // utf8_peek_at returns the utf8 codepoint at the index pos from s.
 uint32_t utf8_peek_at(const char* s, size_t n, size_t pos) {
-    // scan with utf8_next, not utf8_at/utf8_peek: those assume a
-    // nul-terminated string, while here s is bounded by n alone
     size_t i = 0;
     while (pos-- > 0 && i < n) {
         utf8_next(s, n, &i);

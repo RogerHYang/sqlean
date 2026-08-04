@@ -11,11 +11,7 @@
 #include "text/runes.h"
 #include "text/utf8/utf8.h"
 
-// runes_from_cstring creates an array of runes from a C string of n bytes,
-// storing the number of runes in count. Invalid utf8 decodes as U+FFFD
-// (one per maximal ill-formed subpart) rather than being dropped, so the
-// runes always represent every input byte, and the rune count always agrees
-// with the array's contents.
+// runes_from_cstring decodes n bytes into runes and stores their count.
 int32_t* runes_from_cstring(const char* const str, size_t n, size_t* count) {
     assert(n > 0);
     // one rune per byte is the worst case (ascii, or U+FFFD substitutions)
