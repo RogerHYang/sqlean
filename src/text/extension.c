@@ -691,7 +691,7 @@ static void text_change_case(sqlite3_context* context, int argc, sqlite3_value**
 
     // Case conversion can change the utf8 width of a character, so the result
     // needs a buffer of its own. Converting expands by at most half.
-    size_t cap = n * 2 + 1;
+    size_t cap = n + n / 2 + 1;
     char* res = malloc(cap);
     if (res == NULL) {
         sqlite3_result_error_nomem(context);
