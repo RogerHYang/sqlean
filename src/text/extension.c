@@ -4,6 +4,7 @@
 // SQLite extension for working with text.
 
 #include <assert.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -688,18 +689,33 @@ static void text_change_case(sqlite3_context* context, int argc, sqlite3_value**
     }
     size_t n = sqlite3_value_bytes(argv[0]);
 
-    char* res = malloc(n + 1);
+    // Case conversion can change the utf8 width of a character, so the result
+    // needs a buffer of its own. Converting expands by at most half.
+    size_t cap = n * 2 + 1;
+    char* res = malloc(cap);
     if (res == NULL) {
         sqlite3_result_error_nomem(context);
         return;
     }
-    memcpy(res, src, n);
-    res[n] = '\0';
 
-    bool (*fn)(char*, size_t) = sqlite3_user_data(context);
-    fn(res, n);
+    bool (*fn)(const char*, size_t, char*, size_t, size_t*) = sqlite3_user_data(context);
+    size_t len = 0;
+    if (!fn(src, n, res, cap, &len)) {
+        // src is not valid utf8 (or, in theory, the result did not fit in cap),
+        // so there is nothing sensible to convert. Return the input unchanged
+        // rather than a mangled result.
+        free(res);
+        sqlite3_result_value(context, argv[0]);
+        return;
+    }
 
-    sqlite3_result_text(context, res, n, free);
+    if (len > INT_MAX) {
+        // sqlite3_result_text takes an int length.
+        free(res);
+        sqlite3_result_error_toobig(context);
+        return;
+    }
+    sqlite3_result_text(context, res, (int)len, free);
 }
 
 #pragma endregion

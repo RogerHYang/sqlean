@@ -76,103 +76,98 @@ static void test_valid(void) {
     printf("OK\n");
 }
 
+// check_case converts src using fn and asserts the result equals want.
+static void check_case(bool (*fn)(const char*, size_t, char*, size_t, size_t*),
+                       const char* src,
+                       const char* want) {
+    char dst[256];
+    size_t n = strlen(src);
+    assert(n * 2 + 1 <= sizeof(dst));
+    size_t len = 0;
+    assert(fn(src, n, dst, sizeof(dst), &len));
+    assert(len == strlen(want));
+    assert(strcmp(dst, want) == 0);
+}
+
 static void test_tolower(void) {
     printf("test_tolower...");
-    {
-        char s[] = "Hello, WORLD!";
-        utf8_tolower(s, strlen(s));
-        assert(strcmp(s, "hello, world!") == 0);
-    }
-    {
-        char s[] = "Hello, 世界!";
-        utf8_tolower(s, strlen(s));
-        assert(strcmp(s, "hello, 世界!") == 0);
-    }
-    {
-        char s[] = "CÓMO ESTÁS";
-        utf8_tolower(s, strlen(s));
-        assert(strcmp(s, "cómo estás") == 0);
-    }
-    {
-        char s[] = "Привет, МИР!";
-        utf8_tolower(s, strlen(s));
-        assert(strcmp(s, "привет, мир!") == 0);
-    }
+    check_case(utf8_tolower, "Hello, WORLD!", "hello, world!");
+    check_case(utf8_tolower, "Hello, 世界!", "hello, 世界!");
+    check_case(utf8_tolower, "CÓMO ESTÁS", "cómo estás");
+    check_case(utf8_tolower, "Привет, МИР!", "привет, мир!");
+    // conversions that change the utf8 width of a character
+    check_case(utf8_tolower, "İ", "i");
+    check_case(utf8_tolower, "İstanbul", "istanbul");
+    check_case(utf8_tolower, "K", "k");
+    check_case(utf8_tolower, "Ⱥbcd", "ⱥbcd");
     printf("OK\n");
 }
 
 static void test_toupper(void) {
     printf("test_toupper...");
-    {
-        char s[] = "Hello, world!";
-        utf8_toupper(s, strlen(s));
-        assert(strcmp(s, "HELLO, WORLD!") == 0);
-    }
-    {
-        char s[] = "Hello, 世界!";
-        utf8_toupper(s, strlen(s));
-        assert(strcmp(s, "HELLO, 世界!") == 0);
-    }
-    {
-        char s[] = "cómo estás";
-        utf8_toupper(s, strlen(s));
-        assert(strcmp(s, "CÓMO ESTÁS") == 0);
-    }
-    {
-        char s[] = "Привет, мир!";
-        utf8_toupper(s, strlen(s));
-        assert(strcmp(s, "ПРИВЕТ, МИР!") == 0);
-    }
+    check_case(utf8_toupper, "Hello, world!", "HELLO, WORLD!");
+    check_case(utf8_toupper, "Hello, 世界!", "HELLO, 世界!");
+    check_case(utf8_toupper, "cómo estás", "CÓMO ESTÁS");
+    check_case(utf8_toupper, "Привет, мир!", "ПРИВЕТ, МИР!");
+    // conversions that change the utf8 width of a character
+    check_case(utf8_toupper, "ß", "ẞ");
+    check_case(utf8_toupper, "ſ", "S");
+    check_case(utf8_toupper, "ⱥbcd", "ȺBCD");
     printf("OK\n");
 }
 
 static void test_totitle(void) {
     printf("test_totitle...");
-    {
-        char s[] = "hello, world!";
-        utf8_totitle(s, strlen(s));
-        assert(strcmp(s, "Hello, World!") == 0);
-    }
-    {
-        char s[] = "hello, 世界!";
-        utf8_totitle(s, strlen(s));
-        assert(strcmp(s, "Hello, 世界!") == 0);
-    }
-    {
-        char s[] = "cómo estás";
-        utf8_totitle(s, strlen(s));
-        assert(strcmp(s, "Cómo Estás") == 0);
-    }
-    {
-        char s[] = "привет, мир!";
-        utf8_totitle(s, strlen(s));
-        assert(strcmp(s, "Привет, Мир!") == 0);
-    }
+    check_case(utf8_totitle, "hello, world!", "Hello, World!");
+    check_case(utf8_totitle, "hello, 世界!", "Hello, 世界!");
+    check_case(utf8_totitle, "cómo estás", "Cómo Estás");
+    check_case(utf8_totitle, "привет, мир!", "Привет, Мир!");
+    // conversions that change the utf8 width of a character
+    check_case(utf8_totitle, "aK", "Ak");
+    check_case(utf8_totitle, "straße", "Straße");
+    check_case(utf8_totitle, "ßx", "ẞx");
+    printf("OK\n");
+}
+
+static void test_case_embedded_zero(void) {
+    printf("test_case_embedded_zero...");
+    // sqlite text may contain zero bytes; they are part of the value
+    char dst[64];
+    size_t len = 0;
+    assert(utf8_tolower("A\0BC", 4, dst, sizeof(dst), &len));
+    assert(len == 4);
+    assert(memcmp(dst, "a\0bc", 4) == 0);
+    assert(utf8_toupper("a\0bc", 4, dst, sizeof(dst), &len));
+    assert(len == 4);
+    assert(memcmp(dst, "A\0BC", 4) == 0);
     printf("OK\n");
 }
 
 static void test_casefold(void) {
     printf("test_casefold...");
-    {
-        char s[] = "Hello, WORLD!";
-        utf8_casefold(s, strlen(s));
-        assert(strcmp(s, "hello, world!") == 0);
-    }
-    {
-        char s[] = "Hello, 世界!";
-        utf8_casefold(s, strlen(s));
-        assert(strcmp(s, "hello, 世界!") == 0);
-    }
-    {
-        char s[] = "CÓMO ESTÁS";
-        utf8_casefold(s, strlen(s));
-        assert(strcmp(s, "cómo estás") == 0);
-    }
-    {
-        char s[] = "Привет, МИР!";
-        utf8_casefold(s, strlen(s));
-        assert(strcmp(s, "привет, мир!") == 0);
-    }
+    check_case(utf8_casefold, "Hello, WORLD!", "hello, world!");
+    check_case(utf8_casefold, "Hello, 世界!", "hello, 世界!");
+    check_case(utf8_casefold, "CÓMO ESTÁS", "cómo estás");
+    check_case(utf8_casefold, "Привет, МИР!", "привет, мир!");
+    // conversions that change the utf8 width of a character
+    check_case(utf8_casefold, "ẞ", "ß");
+    check_case(utf8_casefold, "K", "k");
+    check_case(utf8_casefold, "Ⱥbcd", "ⱥbcd");
+    printf("OK\n");
+}
+
+static void test_case_invalid(void) {
+    printf("test_case_invalid...");
+    char dst[64];
+    size_t len = 0;
+    // a stray continuation byte and a truncated sequence are both rejected
+    // rather than sending the decoder past the end of the input
+    assert(utf8_tolower("\x80", 1, dst, sizeof(dst), &len) == false);
+    assert(utf8_toupper("\xc3", 1, dst, sizeof(dst), &len) == false);
+    assert(utf8_totitle("a\xe4\xb8", 3, dst, sizeof(dst), &len) == false);
+    assert(utf8_casefold("\xff", 1, dst, sizeof(dst), &len) == false);
+    // a result that does not fit is rejected too
+    assert(utf8_tolower("abc", 3, dst, 2, &len) == false);
     printf("OK\n");
 }
 
@@ -186,4 +181,6 @@ int main(void) {
     test_toupper();
     test_totitle();
     test_casefold();
+    test_case_invalid();
+    test_case_embedded_zero();
 }

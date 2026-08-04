@@ -449,6 +449,12 @@ select '25_03', text_upper('hello') = 'HELLO';
 select '25_04', text_upper('cómo estás') = 'CÓMO ESTÁS';
 select '25_05', text_upper('привет') = 'ПРИВЕТ';
 select '25_06', text_upper('пРиВеТ') = 'ПРИВЕТ';
+-- characters whose uppercase form has a different utf8 byte length
+select '25_07', text_upper('ß') = 'ẞ';
+select '25_08', text_upper('ſ') = 'S';
+select '25_09', text_upper('ⱥ') = 'Ⱥ';
+select '25_10', text_upper('ßx') = 'ẞX';
+select '25_11', octet_length(text_upper('ß')) = 3;
 
 -- Lower
 select '26_01', text_lower(null) is null;
@@ -457,6 +463,22 @@ select '26_03', text_lower('HELLO') = 'hello';
 select '26_04', text_lower('CÓMO ESTÁS') = 'cómo estás';
 select '26_05', text_lower('ПРИВЕТ') = 'привет';
 select '26_06', text_lower('пРиВеТ') = 'привет';
+-- characters whose lowercase form has a different utf8 byte length
+select '26_07', text_lower('İ') = 'i';
+select '26_08', text_lower('İstanbul') = 'istanbul';
+select '26_09', text_lower('K') = 'k';        -- U+212A kelvin sign
+select '26_10', text_lower('Å') = 'å';        -- U+212B angstrom sign
+select '26_11', text_lower('ẞ') = 'ß';
+select '26_12', text_lower('Ⱥ') = 'ⱥ';
+-- the character after a width-changing one must survive intact
+select '26_13', text_lower('Ⱥbcd') = 'ⱥbcd';
+select '26_14', text_lower('İZMİR') = 'izmir';
+select '26_15', octet_length(text_lower('İ')) = 1;
+-- invalid utf8 is returned unchanged rather than crashing
+select '26_16', text_lower(cast(x'80ff' as text)) = cast(x'80ff' as text);
+-- embedded zero bytes are part of the value and must survive the conversion
+select '26_17', hex(text_lower(cast(x'41004243' as text))) = '61006263';
+select '26_18', octet_length(text_lower(cast(x'41004243' as text))) = 4;
 
 -- Title
 select '27_01', text_title(null) is null;
@@ -465,6 +487,15 @@ select '27_03', text_title('hello world') = 'Hello World';
 select '27_04', text_title('cómo estás') = 'Cómo Estás';
 select '27_05', text_title('привет мир') = 'Привет Мир';
 select '27_06', text_title('пРиВеТ мир') = 'Привет Мир';
+-- width-changing characters, both in initial and non-initial position
+select '27_07', text_title('İzmir') = 'İzmir';
+select '27_08', text_title('aK') = 'Ak';       -- U+212A kelvin sign
+select '27_09', text_title('ﬁx') = 'ﬁx';
+select '27_10', text_title('straße') = 'Straße';
+-- a width change at the start of a word (2 bytes -> 3) and inside one (3 -> 1)
+select '27_11', text_title('ßx') = 'ẞx';
+select '27_12', octet_length(text_title('ßx')) = 4;
+select '27_13', octet_length(text_title('a' || cast(x'e284aa' as text))) = 2;
 
 -- Casefold
 select '28_01', text_casefold(null) is null;
@@ -473,6 +504,11 @@ select '28_03', text_casefold('HELLO') = 'hello';
 select '28_04', text_casefold('CÓMO ESTÁS') = 'cómo estás';
 select '28_05', text_casefold('ПРИВЕТ') = 'привет';
 select '28_06', text_casefold('пРиВеТ') = 'привет';
+-- characters whose folded form has a different utf8 byte length
+select '28_07', text_casefold('ẞ') = 'ß';
+select '28_08', text_casefold('ſ') = 's';
+select '28_09', text_casefold('K') = 'k';      -- U+212A kelvin sign
+select '28_10', text_casefold('Ⱥ') = 'ⱥ';
 
 -- Like
 select '29_01', text_like(null, 'hello') is null;

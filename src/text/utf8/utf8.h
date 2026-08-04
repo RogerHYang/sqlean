@@ -39,13 +39,19 @@ int utf8_icmp(const char* s1, size_t n1, const char* s2, size_t n2);
 // utf8_valid returns true if s is a valid utf8 string.
 bool utf8_valid(const char* s, size_t n);
 
-// utf8_tolower converts the utf8 string s to lowercase.
-bool utf8_tolower(char* s, size_t n);
-// utf8_toupper converts the utf8 string s to uppercase.
-bool utf8_toupper(char* s, size_t n);
-// utf8_totitle converts the utf8 string s to title-case.
-bool utf8_totitle(char* s, size_t n);
-// utf8_casefold converts the utf8 string s to folded-case.
-bool utf8_casefold(char* s, size_t n);
+// Case conversion can change the utf8 width of a character, so it cannot be
+// done in place. Each of these converts src (n bytes) into the separate buffer
+// dst (dstcap bytes), storing the result length in dstlen. dst needs room for
+// n*2 + 1 bytes. They return false, leaving dst unusable, if src is not valid
+// utf8 or the result does not fit.
+
+// utf8_tolower converts the utf8 string src to lowercase.
+bool utf8_tolower(const char* src, size_t n, char* dst, size_t dstcap, size_t* dstlen);
+// utf8_toupper converts the utf8 string src to uppercase.
+bool utf8_toupper(const char* src, size_t n, char* dst, size_t dstcap, size_t* dstlen);
+// utf8_totitle converts the utf8 string src to title-case.
+bool utf8_totitle(const char* src, size_t n, char* dst, size_t dstcap, size_t* dstlen);
+// utf8_casefold converts the utf8 string src to folded-case.
+bool utf8_casefold(const char* src, size_t n, char* dst, size_t dstcap, size_t* dstlen);
 
 #endif  // UTF8_H
