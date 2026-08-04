@@ -39,12 +39,6 @@ int utf8_icmp(const char* s1, size_t n1, const char* s2, size_t n2);
 // utf8_valid returns true if s is a valid utf8 string.
 bool utf8_valid(const char* s, size_t n);
 
-// Case conversion can change the utf8 width of a character, so it cannot be
-// done in place. Each of these converts src (n bytes) into the separate buffer
-// dst (dstcap bytes), storing the result length in dstlen. dst needs room for
-// n*2 + 1 bytes. They return false, leaving dst unusable, if src is not valid
-// utf8 or the result does not fit.
-
 // utf8_tolower converts the utf8 string src to lowercase.
 bool utf8_tolower(const char* src, size_t n, char* dst, size_t dstcap, size_t* dstlen);
 // utf8_toupper converts the utf8 string src to uppercase.
