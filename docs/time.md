@@ -840,25 +840,58 @@ time_parse(s)
 
 Parses a formatted string and returns the time value it represents.
 
-Supports a limited set of layouts:
+Supports an ISO 8601-shaped grammar (out-of-range fields are normalized rather than rejected, so it is not strictly a subset):
+
+```text
+date [ sep time [ frac ] [ zone ] ]
+time [ frac ] [ zone ]
+```
+
+| part   | format                | notes                                     |
+| ------ | --------------------- | ----------------------------------------- |
+| `date` | `2006-01-02`          | year `0000`-`9999`, month and day two digits |
+| `sep`  | `T` or whitespace     | one `T`/`t`, or a run of whitespace       |
+| `time` | `15:04:05`            | two digits each                           |
+| `frac` | `.` + one or more digits | only the first nine are kept, the rest discarded |
+| `zone` | `Z`, `z` or `+07:00`  | two digits each                           |
+
+All fields are fixed-width, so `2006-1-2` is not a date. RFC 3339 §5.6 allows a
+lowercase `t` and `z`, and both are accepted. As in SQLite, any run of
+whitespace separates the date from the time.
+
+The separator, the fractional second and the timezone are independent of each
+other, so all of these are valid:
 
 ```text
 2006-01-02T15:04:05.999999999+07:00     ISO 8601 with nanoseconds and timezone
-2006-01-02T15:04:05.999999999Z          ISO 8601 with nanoseconds, UTC
-2006-01-02T15:04:05+07:00               ISO 8601 with timezone
+2006-01-02T15:04:05.999Z                ISO 8601 with milliseconds, UTC
+2006-01-02 15:04:05.999999              Date and time with microseconds, UTC
 2006-01-02T15:04:05Z                    ISO 8601, UTC
 2006-01-02 15:04:05                     Date and time, UTC
 2006-01-02                              Date only, UTC
 15:04:05                                Time only, UTC
 ```
 
+Fields are only bounded by their width; `time_date` normalizes whatever they
+hold, as it always has. So `2011-02-30` is the same instant as `2011-03-02`,
+`2006-13-02` means February 2007, `24:00:00` is midnight the next day, and
+`+24:00` shifts by a day. A *malformed* zone is still rejected — `+0500` and
+`+05:xx` are not offsets.
+
+Returns the zero time (year 1) if the value does not parse, including when
+anything at all is left over after the timestamp. The zero time is also a legal value, so a
+caller cannot tell the two apart.
+
 ```sql
 select time_parse('2011-11-18T15:56:35.666777888Z')      = time_unix(1321631795, 666777888);
+select time_parse('2011-11-18T15:56:35.666777Z')         = time_unix(1321631795, 666777000);
+select time_parse('2011-11-18T15:56:35.666Z')            = time_unix(1321631795, 666000000);
 select time_parse('2011-11-18T19:26:35.666777888+03:30') = time_unix(1321631795, 666777888);
 select time_parse('2011-11-18T12:26:35.666777888-03:30') = time_unix(1321631795, 666777888);
 select time_parse('2011-11-18T15:56:35Z')                = time_unix(1321631795, 0);
 select time_parse('2011-11-18T19:26:35+03:30')           = time_unix(1321631795, 0);
 select time_parse('2011-11-18T12:26:35-03:30')           = time_unix(1321631795, 0);
+select time_parse('2011-11-18 15:56:35.666777')          = time_unix(1321631795, 666777000);
 select time_parse('2011-11-18 15:56:35')                 = time_unix(1321631795, 0);
 select time_parse('2011-11-18')                          = time_date(2011, 11, 18);
 select time_parse('15:56:35')                            = time_date(1, 1, 1, 15, 56, 35);
