@@ -885,8 +885,7 @@ FormatTest parse_tests[] = {
     {2011, 11, 18, 16, 56, 35, 0, "2011-11-18T16:56:35+00:00", TIMEX_UTC},
     {2011, 11, 18, 16, 56, 35, 0, "2011-11-18T16:56:35-00:00", TIMEX_UTC},
 
-    // Out-of-range date and clock fields are normalized by time_date, as before.
-    // Only the timezone offset is range-checked.
+    // Out-of-range date and clock fields are normalized by time_date.
     {2012, 1, 18, 15, 56, 35, 0, "2011-13-18T15:56:35Z", TIMEX_UTC},
     {2011, 12, 2, 15, 56, 35, 0, "2011-11-32T15:56:35Z", TIMEX_UTC},
     {2011, 11, 19, 0, 56, 35, 0, "2011-11-18T24:56:35Z", TIMEX_UTC},
@@ -977,7 +976,7 @@ static void test_parse(void) {
         //        time_to_unix(got), got.nsec);
         assert(time_equal(got, want));
     }
-    // A null pointer is not a crash.
+    // NULL returns the zero time.
     {
         Time zero = time_date(1, 1, 1, 0, 0, 0, 0, TIMEX_UTC);
         assert(time_equal(time_parse(NULL), zero));

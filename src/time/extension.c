@@ -705,8 +705,7 @@ static void fn_parse(sqlite3_context* context, int argc, sqlite3_value** argv) {
     const char* val = (const char*)sqlite3_value_text(argv[0]);
     int nbytes = sqlite3_value_bytes(argv[0]);
     if (val == NULL || strlen(val) != (size_t)nbytes) {
-        // SQLite text may contain an embedded NUL, but time_parse would stop
-        // there and silently ignore the rest. Treat the value as unparseable.
+        // time_parse accepts NUL-terminated strings, so embedded NUL bytes are invalid.
         result_blob(context, (Time){0, 0});
         return;
     }

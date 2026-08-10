@@ -302,7 +302,7 @@ select '68_20', time_parse('9999-12-31T23:59:59.999999999Z') = time_date(9999, 1
 select '68_21', time_parse('0000-01-01T00:00:00Z') = time_date(0, 1, 1);
 select '68_22', time_parse('2011-11-18T16:56:35+23:59') = time_date(2011, 11, 17, 16, 57, 35);
 select '68_23', time_parse('2011-11-18T16:56:35-23:59') = time_date(2011, 11, 19, 16, 55, 35);
--- text with an embedded NUL is not silently truncated at the NUL
+-- text with an embedded NUL is unparseable
 select '68_24', time_parse(cast('2011-11-18' || char(0) || 'junk' as text)) = time_date(1, 1, 1);
 
 -- any run of whitespace separates the date from the time, as in SQLite
