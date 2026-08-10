@@ -214,6 +214,7 @@ size_t time_fmt_date(char* buf, size_t size, Time t, int offset_sec);
 size_t time_fmt_time(char* buf, size_t size, Time t, int offset_sec);
 
 // time_parse parses a formatted string and returns the time value it represents.
+// Returns zero time for NULL or invalid syntax; zero time is also a valid result.
 Time time_parse(const char* value);
 
 // Marshaling.

@@ -878,9 +878,9 @@ hold, as it always has. So `2011-02-30` is the same instant as `2011-03-02`,
 `+24:00` shifts by a day. A *malformed* zone is still rejected — `+0500` and
 `+05:xx` are not offsets.
 
-Returns the zero time (year 1) if the value does not parse, including when
-anything at all is left over after the timestamp. The zero time is also a legal value, so a
-caller cannot tell the two apart.
+SQL `NULL` propagates. Other values return the zero time (year 1) if they do not
+parse, including when anything remains after the timestamp. The zero time is
+also a legal value, so a caller cannot tell it from a parse failure.
 
 ```sql
 select time_parse('2011-11-18T15:56:35.666777888Z')      = time_unix(1321631795, 666777888);
