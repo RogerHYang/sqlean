@@ -846,8 +846,7 @@ FormatTest parse_tests[] = {
     {1, 1, 1, 15, 56, 35, 0, "15:56:35", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18 10:56", TIMEX_UTC},
 
-    // A fractional second is accepted at any width from one to nine digits,
-    // and always means the same instant.
+    // Fractional seconds are scaled to nanoseconds.
     {2011, 11, 18, 15, 56, 35, 600000000, "2011-11-18T15:56:35.6Z", TIMEX_UTC},
     {2011, 11, 18, 15, 56, 35, 660000000, "2011-11-18T15:56:35.66Z", TIMEX_UTC},
     {2011, 11, 18, 15, 56, 35, 666000000, "2011-11-18T15:56:35.666Z", TIMEX_UTC},
@@ -856,12 +855,12 @@ FormatTest parse_tests[] = {
     {2011, 11, 18, 15, 56, 35, 666777888, "2011-11-18T15:56:35.666777888Z", TIMEX_UTC},
     // Digits past the ninth are discarded, not rounded.
     {2011, 11, 18, 15, 56, 35, 666777888, "2011-11-18T15:56:35.6667778889Z", TIMEX_UTC},
-    // A whole-second fraction does not shift the clock.
+    // Zero fraction.
     {2011, 11, 18, 15, 56, 35, 0, "2011-11-18T15:56:35.0000Z", TIMEX_UTC},
 
-    // The separator, the fraction and the zone are independent of each other.
+    // Independent separator, fraction, and zone forms.
     {2011, 11, 18, 15, 56, 35, 666777000, "2011-11-18 15:56:35.666777", TIMEX_UTC},
-    // A space in a Go layout matches a run of spaces in the value.
+    // Repeated separator spaces.
     {2011, 11, 18, 15, 56, 35, 0, "2011-11-18  15:56:35", TIMEX_UTC},
     {2011, 11, 18, 15, 56, 35, 0, "2011-11-18     15:56:35", TIMEX_UTC},
     {2011, 11, 18, 15, 56, 35, 666777000, "2011-11-18  15:56:35.666777Z", TIMEX_UTC},
@@ -870,16 +869,16 @@ FormatTest parse_tests[] = {
     {2011, 11, 18, 15, 56, 35, 666000000, "2011-11-18 20:56:35.666+05:00", 5 * 3600},
     {2011, 11, 18, 15, 56, 35, 0, "2011-11-18 20:56:35+05:00", 5 * 3600},
     {1, 1, 1, 15, 56, 35, 666000000, "15:56:35.666Z", TIMEX_UTC},
-    // A time of day may carry a zone, as ISO 8601 allows and Postgres timetz prints.
+    // Zoned time-only forms.
     {1, 1, 1, 12, 26, 35, 0, "15:56:35+03:30", TIMEX_UTC},
     {1, 1, 1, 19, 26, 35, 0, "15:56:35-03:30", TIMEX_UTC},
     {1, 1, 1, 12, 26, 35, 666000000, "15:56:35.666+03:30", TIMEX_UTC},
 
-    // Accepted at the edge of each fixed-width field.
+    // Boundary values.
     {9999, 12, 31, 23, 59, 59, 999999999, "9999-12-31T23:59:59.999999999Z", TIMEX_UTC},
     {0, 1, 1, 0, 0, 0, 0, "0000-01-01T00:00:00Z", TIMEX_UTC},
     {2011, 1, 1, 0, 0, 0, 0, "2011-01-01T00:00:00Z", TIMEX_UTC},
-    // Offsets at the edge, given as the equivalent UTC instant.
+    // Signed offsets.
     {2011, 11, 17, 16, 57, 35, 0, "2011-11-18T16:56:35+23:59", TIMEX_UTC},
     {2011, 11, 19, 16, 55, 35, 0, "2011-11-18T16:56:35-23:59", TIMEX_UTC},
     {2011, 11, 18, 16, 56, 35, 0, "2011-11-18T16:56:35+00:00", TIMEX_UTC},
@@ -896,25 +895,24 @@ FormatTest parse_tests[] = {
     {2012, 7, 1, 0, 0, 0, 0, "2012-06-30T23:59:60Z", TIMEX_UTC},
     {2011, 11, 19, 0, 0, 0, 0, "2011-11-18T24:00:00Z", TIMEX_UTC},
 
-    // An out-of-range offset normalizes, as the other fields do.
+    // Out-of-range offsets are normalized.
     {2011, 11, 17, 15, 56, 35, 0, "2011-11-18T15:56:35+24:00", TIMEX_UTC},
     {2011, 11, 18, 9, 56, 35, 0, "2011-11-18T15:56:35+05:60", TIMEX_UTC},
     {2011, 11, 14, 11, 17, 35, 0, "2011-11-18T15:56:35+99:99", TIMEX_UTC},
 
-    // A day that does not exist in the month is normalized forward, not rejected.
+    // Nonexistent dates are normalized forward.
     {2011, 3, 2, 0, 0, 0, 0, "2011-02-30", TIMEX_UTC},
     {2011, 5, 1, 0, 0, 0, 0, "2011-04-31", TIMEX_UTC},
     {2011, 3, 1, 0, 0, 0, 0, "2011-02-29", TIMEX_UTC},
     {2012, 2, 29, 0, 0, 0, 0, "2012-02-29", TIMEX_UTC},
 
-    // Rejected: everything below parses to the zero time.
+    // Invalid forms.
     // Trailing characters.
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15:56:35.666777888Y", TIMEX_UTC},
     // Leading characters.
     {1, 1, 1, 0, 0, 0, 0, " 2011-11-18T15:56:35Z", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "+2011-11-18T15:56:35Z", TIMEX_UTC},
-    // A malformed offset is rejected, but an out-of-range one normalizes like
-    // every other field.
+    // Malformed offsets.
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15:56:35+0500", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15:56:35+05", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15:56:35+05:xx", TIMEX_UTC},
@@ -925,11 +923,11 @@ FormatTest parse_tests[] = {
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15:56:35+05:xx", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15:56:35+0500", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15:56:35+05", TIMEX_UTC},
-    // The date's own separators are required, both of them.
+    // Date separators.
     {1, 1, 1, 0, 0, 0, 0, "2011X11-18T15:56:35Z", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "2011-11X18T15:56:35Z", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "20111118T15:56:35Z", TIMEX_UTC},
-    // The time's separators too.
+    // Clock separators.
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15X56:35Z", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15:56X35Z", TIMEX_UTC},
     // Non-fixed-width fields and unrecognized separators.
@@ -942,17 +940,14 @@ FormatTest parse_tests[] = {
     {2011, 11, 18, 15, 56, 35, 666000000, "2011-11-18T15:56:35.666z", TIMEX_UTC},
     {1, 1, 1, 15, 56, 35, 0, "15:56:35z", TIMEX_UTC},
 
-    // Any run of whitespace separates the date from the time, as in SQLite.
+    // ASCII whitespace separators.
     {2011, 11, 18, 15, 56, 35, 0, "2011-11-18\t15:56:35", TIMEX_UTC},
     {2011, 11, 18, 15, 56, 35, 0, "2011-11-18\n15:56:35", TIMEX_UTC},
     {2011, 11, 18, 15, 56, 35, 0, "2011-11-18\r15:56:35", TIMEX_UTC},
-    // Every whitespace character SQLite treats as one, not just the space.
     {2011, 11, 18, 15, 56, 35, 0, "2011-11-18\v15:56:35", TIMEX_UTC},
     {2011, 11, 18, 15, 56, 35, 0, "2011-11-18\f15:56:35", TIMEX_UTC},
 
-    // Trailing characters, whitespace included, are not consumed. Whitespace
-    // separates the date from the time and nothing else: not the zone, and not
-    // the end of the string.
+    // Whitespace is valid only as the date-clock separator.
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T20:56:35 +05:00", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T20:56:35\t+05:00", TIMEX_UTC},
     {1, 1, 1, 0, 0, 0, 0, "2011-11-18T15:56:35Z ", TIMEX_UTC},

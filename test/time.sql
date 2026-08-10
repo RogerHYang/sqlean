@@ -270,7 +270,7 @@ select '66_05', time_parse('2011-11-18T15:56:35.666777Z') = time_unix(1321631795
 select '66_06', time_parse('2011-11-18T15:56:35.666777888Z') = time_unix(1321631795, 666777888);
 -- digits past the ninth are discarded
 select '66_07', time_parse('2011-11-18T15:56:35.6667778889Z') = time_unix(1321631795, 666777888);
--- a whole-second fraction must not shift the clock
+-- zero fraction
 select '66_08', time_parse('2011-11-18T15:56:35.0000Z') = time_unix(1321631795, 0);
 select '66_09', time_fmt_iso(time_parse('2011-11-18T15:56:35.0000Z')) = '2011-11-18T15:56:35Z';
 
@@ -281,7 +281,7 @@ select '67_03', time_parse('2011-11-18 15:56:35.666777Z') = time_unix(1321631795
 select '67_04', time_parse('2011-11-18 19:26:35.666+03:30') = time_unix(1321631795, 666000000);
 select '67_05', time_parse('2011-11-18 19:26:35+03:30') = time_unix(1321631795, 0);
 select '67_06', time_parse('15:56:35.666Z') = time_date(1, 1, 1, 15, 56, 35, 666000000);
--- a time of day may carry a zone (ISO 8601; Postgres timetz prints this)
+-- zoned time-only forms
 select '67_07', time_parse('15:56:35+03:30') = time_date(1, 1, 1, 12, 26, 35);
 select '67_08', time_parse('15:56:35-03:30') = time_date(1, 1, 1, 19, 26, 35);
 
@@ -297,7 +297,7 @@ select '68_15', time_parse('garbage') = time_date(1, 1, 1);
 select '68_16', time_parse('2011-11-18t15:56:35Z') = time_unix(1321631795, 0);
 select '68_17', time_parse('2011-11-18T15:56:35z') = time_unix(1321631795, 0);
 
--- time_parse: accepted at the edge of every range
+-- time_parse: boundary values
 select '68_20', time_parse('9999-12-31T23:59:59.999999999Z') = time_date(9999, 12, 31, 23, 59, 59, 999999999);
 select '68_21', time_parse('0000-01-01T00:00:00Z') = time_date(0, 1, 1);
 select '68_22', time_parse('2011-11-18T16:56:35+23:59') = time_date(2011, 11, 17, 16, 57, 35);
@@ -305,7 +305,7 @@ select '68_23', time_parse('2011-11-18T16:56:35-23:59') = time_date(2011, 11, 19
 -- text with an embedded NUL is unparseable
 select '68_24', time_parse(cast('2011-11-18' || char(0) || 'junk' as text)) = time_date(1, 1, 1);
 
--- any run of whitespace separates the date from the time, as in SQLite
+-- ASCII whitespace separators
 select '68_25', time_parse('2011-11-18  15:56:35') = time_unix(1321631795, 0);
 select '68_26', time_parse('2011-11-18     15:56:35') = time_unix(1321631795, 0);
 select '68_27', time_parse(char(50,48,49,49,45,49,49,45,49,56,9,49,53,58,53,54,58,51,53)) = time_unix(1321631795, 0);
@@ -322,7 +322,7 @@ select '72_06', time_parse('2011-11-18T15:56.5Z') = time_date(1, 1, 1);
 select '72_07', time_parse('2011-11X18T15:56:35Z') = time_date(1, 1, 1);
 select '72_08', time_parse('2011-11-18T15:56X35Z') = time_date(1, 1, 1);
 
--- an out-of-range timezone offset normalizes too; only a malformed one is rejected
+-- out-of-range timezone offsets normalize; malformed offsets are rejected
 select '73_01', time_parse('2011-11-18T15:56:35+24:00') = time_date(2011, 11, 17, 15, 56, 35);
 select '73_02', time_parse('2011-11-18T15:56:35+05:60') = time_date(2011, 11, 18, 9, 56, 35);
 select '73_03', time_parse('2011-11-18T15:56:35+0500') = time_date(1, 1, 1);
@@ -338,7 +338,7 @@ select '70_05', time_parse('2011-11-18T15:56:60Z') = time_date(2011, 11, 18, 15,
 select '70_06', time_parse('2012-06-30T23:59:60Z') = time_date(2012, 7, 1);
 select '70_07', time_parse('2011-00-18T15:56:35Z') = time_date(2010, 12, 18, 15, 56, 35);
 
--- time_parse: a day absent from the month is normalized forward, not rejected
+-- time_parse: nonexistent dates are normalized forward
 select '69_01', time_parse('2011-02-30') = time_date(2011, 3, 2);
 select '69_02', time_parse('2011-04-31') = time_date(2011, 5, 1);
 select '69_03', time_parse('2011-02-29') = time_date(2011, 3, 1);

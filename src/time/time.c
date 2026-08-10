@@ -836,7 +836,7 @@ static const char* scan_frac(const char* p, int* nsec) {
 // scan_zone reads a timezone offset (Z or +07:00).
 // Returns a pointer to the character after the offset, or NULL on failure.
 static const char* scan_zone(const char* p, int* offset_sec) {
-    // RFC 3339 section 5.6 allows a lowercase "z", as does the "t" separator.
+    // RFC 3339 permits lowercase "z".
     if (*p == 'Z' || *p == 'z') {
         *offset_sec = TIMEX_UTC;
         return p + 1;
@@ -891,34 +891,12 @@ static const char* scan_clock(const char* p,
     return p;
 }
 
-// time_parse parses a formatted string and returns the time value it represents.
-// Consumes the string left to right and rejects anything it does not recognize,
-// including trailing characters and a malformed timezone offset.
-//
-// The layout is:
-//
-//     date [ sep time [ frac ] [ zone ] ]
-//     time [ frac ] [ zone ]
-//
-// where date is 2006-01-02, sep is a "T" or a run of whitespace, time is
-// 15:04:05,
-// frac is a "." followed by one or more digits (only the first nine are kept),
-// and zone is "Z", "z" or ±07:00.
-// So all of these are valid:
-// - "2006-01-02T15:04:05.999999999+07:00"
-// - "2006-01-02T15:04:05.999Z"
-// - "2006-01-02 15:04:05.999999"
-// - "2006-01-02T15:04:05Z"
-// - "2006-01-02 15:04:05"
-// - "2006-01-02"
-// - "15:04:05"
-//
-// Date and clock fields are only bounded by their width; time_date normalizes
-// whatever they hold, so "2011-02-30" is "2011-03-02" and "24:00:00" is
-// midnight the next day, and "+24:00" shifts by a day.
-//
-// Returns the zero time (year 1) if the value does not parse. The zero time is
-// also a legal value, so a caller cannot tell the two apart.
+// time_parse parses either date [separator clock] or clock, where date is
+// "2006-01-02", separator is "T"/"t" or one or more ASCII whitespace characters,
+// and clock is "15:04:05" with optional fraction and zone ("Z"/"z" or ±07:00).
+// Numeric date, clock, and offset fields have fixed widths but no range checks;
+// time_date normalizes them. Fractions beyond nine digits are truncated.
+// Returns zero time on invalid syntax or NULL; zero time is also a valid result.
 Time time_parse(const char* value) {
     Time zero = {0, 0};
     if (value == NULL) {
@@ -930,18 +908,15 @@ Time time_parse(const char* value) {
 
     const char* p = scan_date(value, &year, &month, &day);
     if (p != NULL) {
-        // a date, optionally followed by a time
         if (*p == 'T' || *p == 't') {
             p = scan_clock(p + 1, &hour, &min, &sec, &nsec, &offset_sec);
         } else if (is_space(*p)) {
-            // A run of whitespace separates the date from the time, as in SQLite.
             while (is_space(*p)) {
                 p++;
             }
             p = scan_clock(p, &hour, &min, &sec, &nsec, &offset_sec);
         }
     } else {
-        // a time on its own
         p = scan_clock(value, &hour, &min, &sec, &nsec, &offset_sec);
     }
     if (p == NULL || *p != '\0') {
