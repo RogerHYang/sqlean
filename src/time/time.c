@@ -781,9 +781,9 @@ static bool is_space(char c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r';
 }
 
-// scan_digits reads exactly n digits and checks that the value is in [min, max].
+// scan_digits reads exactly n digits.
 // Returns a pointer to the character after the digits, or NULL on failure.
-static const char* scan_digits(const char* p, int n, int min, int max, int* out) {
+static const char* scan_digits(const char* p, int n, int* out) {
     int val = 0;
     for (int i = 0; i < n; i++) {
         if (*p < '0' || *p > '9') {
@@ -792,9 +792,6 @@ static const char* scan_digits(const char* p, int n, int min, int max, int* out)
         val = val * 10 + (*p - '0');
         p++;
     }
-    if (val < min || val > max) {
-        return NULL;
-    }
     *out = val;
     return p;
 }
@@ -802,15 +799,15 @@ static const char* scan_digits(const char* p, int n, int min, int max, int* out)
 // scan_date reads a date (2006-01-02).
 // Returns a pointer to the character after the date, or NULL on failure.
 static const char* scan_date(const char* p, int* year, int* month, int* day) {
-    p = scan_digits(p, 4, 0, 9999, year);
+    p = scan_digits(p, 4, year);
     if (p == NULL || *p != '-') {
         return NULL;
     }
-    p = scan_digits(p + 1, 2, 0, 99, month);
+    p = scan_digits(p + 1, 2, month);
     if (p == NULL || *p != '-') {
         return NULL;
     }
-    return scan_digits(p + 1, 2, 0, 99, day);
+    return scan_digits(p + 1, 2, day);
 }
 
 // scan_frac reads a fractional second (.999999999) and scales it to nanoseconds.
@@ -846,11 +843,11 @@ static const char* scan_zone(const char* p, int* offset_sec) {
     }
     int sign = (*p == '-') ? -1 : 1;
     int hour, min;
-    p = scan_digits(p + 1, 2, 0, 99, &hour);
+    p = scan_digits(p + 1, 2, &hour);
     if (p == NULL || *p != ':') {
         return NULL;
     }
-    p = scan_digits(p + 1, 2, 0, 99, &min);
+    p = scan_digits(p + 1, 2, &min);
     if (p == NULL) {
         return NULL;
     }
@@ -867,15 +864,15 @@ static const char* scan_clock(const char* p,
                               int* sec,
                               int* nsec,
                               int* offset_sec) {
-    p = scan_digits(p, 2, 0, 99, hour);
+    p = scan_digits(p, 2, hour);
     if (p == NULL || *p != ':') {
         return NULL;
     }
-    p = scan_digits(p + 1, 2, 0, 99, min);
+    p = scan_digits(p + 1, 2, min);
     if (p == NULL || *p != ':') {
         return NULL;
     }
-    p = scan_digits(p + 1, 2, 0, 99, sec);
+    p = scan_digits(p + 1, 2, sec);
     if (p == NULL) {
         return NULL;
     }
