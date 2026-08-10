@@ -127,7 +127,7 @@ static Time unix_time(int64_t sec, int32_t nsec) {
 // abs_time returns the time t as an absolute time, adjusted by the zone offset.
 // It is called when computing a presentation property like Month or Hour.
 static uint64_t abs_time(Time t) {
-    return t.sec + internal_to_absolute;
+    return (uint64_t)t.sec + (uint64_t)internal_to_absolute;
 }
 
 // abs_weekday is like Weekday but operates on an absolute time.
