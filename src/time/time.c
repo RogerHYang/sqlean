@@ -783,13 +783,6 @@ static bool is_space(char c) {
 
 // scan_digits reads exactly n digits and checks that the value is in [min, max].
 // Returns a pointer to the character after the digits, or NULL on failure.
-//
-// Every field passes the widest range a fixed-width field can hold, so all of
-// them are bounded only by their width: time_date normalizes out-of-range
-// values, as it always has, and "2006-13-02" still means February 2007. The old
-// parser's 72-hour offsets came from reading a fractional second as a zone,
-// which a cursor scan cannot do -- the zone is read only when the cursor is
-// already on it -- so no range check is needed to prevent them.
 static const char* scan_digits(const char* p, int n, int min, int max, int* out) {
     int val = 0;
     for (int i = 0; i < n; i++) {
