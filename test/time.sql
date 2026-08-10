@@ -186,7 +186,12 @@ select '51_03', time_trunc(time_unix(1321631795, 666777888), 'decade') = time_da
 select '51_04', time_trunc(time_unix(1321631795, 666777888), 'year') = time_date(2011, 1, 1);
 select '51_05', time_trunc(time_unix(1321631795, 666777888), 'quarter') = time_date(2011, 10, 1);
 select '51_06', time_trunc(time_unix(1321631795, 666777888), 'month') = time_date(2011, 11, 1);
-select '51_07', time_trunc(time_unix(1321631795, 666777888), 'week') = time_date(2011, 11, 12);
+-- week truncates to the Monday of the current ISO week (2011-11-18 was a Friday)
+select '51_07', time_trunc(time_unix(1321631795, 666777888), 'week') = time_date(2011, 11, 14);
+select '51_07a', time_trunc(time_date(2023, 1, 4), 'week') = time_date(2023, 1, 2);
+select '51_07b', time_trunc(time_date(2023, 1, 1), 'week') = time_date(2022, 12, 26);
+select '51_07c', time_trunc(time_date(2024, 3, 13), 'week') = time_date(2024, 3, 11);
+select '51_07d', time_trunc(time_date(2023, 12, 31), 'week') = time_date(2023, 12, 25);
 select '51_08', time_trunc(time_unix(1321631795, 666777888), 'day') = time_date(2011, 11, 18);
 select '51_09', time_trunc(time_unix(1321631795, 666777888), 'hour') = time_date(2011, 11, 18, 15, 0, 0);
 select '51_10', time_trunc(time_unix(1321631795, 666777888), 'minute') = time_date(2011, 11, 18, 15, 56, 0);
@@ -222,6 +227,10 @@ select '61_05', time_fmt_iso(time_unix(1321631795, 0)) = '2011-11-18T15:56:35Z';
 select '61_06', time_fmt_iso(time_unix(1321631795, 0), 0) = '2011-11-18T15:56:35Z';
 select '61_07', time_fmt_iso(time_unix(1321631795, 0), 3*3600+30*60) = '2011-11-18T19:26:35+03:30';
 select '61_08', time_fmt_iso(time_unix(1321631795, 0), -3*3600-30*60) = '2011-11-18T12:26:35-03:30';
+-- negative sub-hour offsets must keep their sign
+select '61_09', time_fmt_iso(time_unix(0, 0), -1800) = '1969-12-31T23:30:00-00:30';
+select '61_10', time_fmt_iso(time_unix(0, 0), -1799) = '1969-12-31T23:30:01-00:29';
+select '61_11', time_fmt_iso(time_unix(0, 0), 19800) = '1970-01-01T05:30:00+05:30';
 
 -- time_fmt_datetime
 -- 2011-11-18 15:56:35.666777888

@@ -62,6 +62,15 @@ static bool dless_than_half(Duration x, Duration y) {
     return (uint64_t)x + (uint64_t)x < (uint64_t)y;
 }
 
+// uint64_to_int64 interprets u modulo 2^64 as a signed 64-bit value.
+// Unlike a direct cast, this is fully defined when u > INT64_MAX.
+static int64_t uint64_to_int64(uint64_t u) {
+    if (u <= INT64_MAX) {
+        return (int64_t)u;
+    }
+    return -1 - (int64_t)(UINT64_MAX - u);
+}
+
 // dur_truncate returns the result of rounding d toward zero to a multiple of m.
 // If m <= 0, Truncate returns d unchanged.
 Duration dur_truncate(Duration d, Duration m) {
@@ -83,12 +92,16 @@ Duration dur_round(Duration d, Duration m) {
     }
     int64_t r = d % m;
 
+    // The candidate sums below are computed in uint64_t: when the true sum
+    // overflows int64_t (as in Go, which wraps around), the wrapped value
+    // fails the d1 </> d comparison, so the result clamps to MIN/MAX_DURATION.
+    // Plain int64_t arithmetic would make the overflow undefined behavior.
     if (d < 0) {
         r = -r;
         if (dless_than_half(r, m)) {
             return d + r;
         }
-        int64_t d1 = d - m + r;
+        int64_t d1 = uint64_to_int64((uint64_t)d - (uint64_t)m + (uint64_t)r);
         if (d1 < d) {
             return d1;
         }
@@ -98,7 +111,7 @@ Duration dur_round(Duration d, Duration m) {
     if (dless_than_half(r, m)) {
         return d - r;
     }
-    int64_t d1 = d + m - r;
+    int64_t d1 = uint64_to_int64((uint64_t)d + (uint64_t)m - (uint64_t)r);
     if (d1 > d) {
         return d1;
     }

@@ -4,6 +4,7 @@
 // Time tests.
 
 #include <assert.h>
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -82,6 +83,9 @@ static void test_date(void) {
                            test.nsec, test.offset_sec);
         assert(time_to_unix(t) == test.epoch);
     }
+    // Normalizing INT_MIN month must preserve its negative magnitude.
+    assert(time_equal(time_date(2000, INT_MIN, 1, 0, 0, 0, 0, TIMEX_UTC),
+                      time_date(-178954971, April, 1, 0, 0, 0, 0, TIMEX_UTC)));
     printf("OK\n");
 }
 
@@ -247,6 +251,37 @@ static void test_get_yearday(void) {
     printf("OK\n");
 }
 
+// abs_date_full must not misreport March 1 as February 29 in leap years
+// (the leap-day branches must be mutually exclusive).
+static void test_leap_day_boundary(void) {
+    printf("test_leap_day_boundary...");
+    int leap_years[] = {2000, 2004, 2024, 272, 0, -400, 4, 2028};
+    for (size_t i = 0; i < sizeof(leap_years) / sizeof(leap_years[0]); i++) {
+        int y = leap_years[i];
+        Time feb29 = time_date(y, 2, 29, 12, 0, 0, 0, TIMEX_UTC);
+        Time mar01 = time_date(y, 3, 1, 12, 0, 0, 0, TIMEX_UTC);
+        int year, day;
+        enum Month month;
+        time_get_date(feb29, &year, &month, &day);
+        assert(year == y && month == February && day == 29);
+        time_get_date(mar01, &year, &month, &day);
+        assert(year == y && month == March && day == 1);
+        // The two dates must be exactly one day apart.
+        assert(time_sub(mar01, feb29) == 24 * Hour);
+    }
+    // Non-leap years: February 29 normalizes to March 1.
+    int plain_years[] = {2011, 1900, 2100, 1, -1};
+    for (size_t i = 0; i < sizeof(plain_years) / sizeof(plain_years[0]); i++) {
+        int y = plain_years[i];
+        Time t = time_date(y, 2, 29, 12, 0, 0, 0, TIMEX_UTC);
+        int year, day;
+        enum Month month;
+        time_get_date(t, &year, &month, &day);
+        assert(year == y && month == March && day == 1);
+    }
+    printf("OK\n");
+}
+
 #pragma endregion
 
 #pragma region Unix time.
@@ -331,7 +366,10 @@ static void test_to_nano(void) {
     for (size_t i = 0; i < sizeof(unix_tests) / sizeof(unix_tests[0]); i++) {
         TimeTest test = unix_tests[i];
         Time t = time_unix(test.sec, test.nsec);
-        assert(time_to_nano(t) == test.sec * 1000000000 + test.nsec);
+        // Wraparound arithmetic: -11644473600 * 1e9 overflows int64_t,
+        // and time_to_nano is defined to wrap around modulo 2^64.
+        uint64_t want = (uint64_t)test.sec * 1000000000 + (uint64_t)test.nsec;
+        assert((uint64_t)time_to_nano(t) == want);
     }
     printf("OK\n");
 }
@@ -376,6 +414,10 @@ static void test_tm(void) {
         //        time_to_unix(want), time_to_unix(got));
         assert(time_equal(want, got));
     }
+    // Wide intermediates must preserve cancellation across year and month.
+    struct tm extreme = {.tm_year = INT_MAX, .tm_mon = -1900 * 12, .tm_mday = 1};
+    assert(time_equal(time_tm(extreme, TIMEX_UTC),
+                      time_date(INT_MAX, January, 1, 0, 0, 0, 0, TIMEX_UTC)));
     printf("OK\n");
 }
 
@@ -643,6 +685,8 @@ static void test_add_date(void) {
         Time t = time_add_date(t0, test.years, test.months, test.days);
         assert(time_equal(t, t1));
     }
+    Time extreme = time_date(INT_MAX, January, 1, 0, 0, 0, 0, TIMEX_UTC);
+    assert(time_equal(time_add_date(extreme, 1, -12, 0), extreme));
     printf("OK\n");
 }
 
@@ -980,6 +1024,166 @@ static void test_parse(void) {
     printf("OK\n");
 }
 
+// Roundtrip: formatting then parsing must reproduce in-range times exactly.
+// Wider and negative years print in full but do not parse because the parser
+// accepts exactly four unsigned year digits.
+static void test_fmt_parse_roundtrip(void) {
+    printf("test_fmt_parse_roundtrip...");
+    Time times[] = {
+        time_date(2011, 11, 18, 15, 56, 35, 666777888, TIMEX_UTC),
+        time_date(1, 1, 1, 0, 0, 0, 0, TIMEX_UTC),
+        time_date(9999, 12, 31, 23, 59, 59, 999999999, TIMEX_UTC),
+        time_date(0, 1, 1, 0, 0, 0, 0, TIMEX_UTC),
+        time_date(2000, 2, 29, 12, 0, 0, 1, TIMEX_UTC),
+    };
+    for (size_t i = 0; i < sizeof(times) / sizeof(times[0]); i++) {
+        char buf[64];
+        time_fmt_iso(buf, sizeof(buf), times[i], TIMEX_UTC);
+        Time got = time_parse(buf);
+        assert(time_equal(got, times[i]));
+    }
+    // Years outside [0, 9999] print in full (like Go) and must not parse
+    // back to t, since the parser accepts exactly four year digits.
+    struct {
+        Time t;
+        const char* want;
+    } wide[] = {
+        {time_date(10000, 1, 1, 0, 0, 0, 0, TIMEX_UTC), "10000-01-01T00:00:00Z"},
+        {time_date(10001, 1, 1, 0, 0, 0, 0, TIMEX_UTC), "10001-01-01T00:00:00Z"},
+        {time_date(-1, 6, 15, 12, 30, 0, 0, TIMEX_UTC), "-0001-06-15T12:30:00Z"},
+        {time_date(-20, 7, 10, 0, 0, 0, 0, TIMEX_UTC), "-0020-07-10T00:00:00Z"},
+    };
+    for (size_t i = 0; i < sizeof(wide) / sizeof(wide[0]); i++) {
+        char buf[64];
+        size_t n = time_fmt_iso(buf, sizeof(buf), wide[i].t, TIMEX_UTC);
+        assert(n < TIMEX_FMT_BUF_SIZE);  // fits into the SQL-layer buffer
+        assert(strcmp(buf, wide[i].want) == 0);
+        Time got = time_parse(buf);
+        assert(!time_equal(got, wide[i].t));
+    }
+    // Distinct years must remain distinguishable after formatting.
+    char b1[64], b2[64];
+    time_fmt_iso(b1, sizeof(b1), time_date(9999, 1, 1, 0, 0, 0, 0, TIMEX_UTC), TIMEX_UTC);
+    time_fmt_iso(b2, sizeof(b2), time_date(10000, 1, 1, 0, 0, 0, 0, TIMEX_UTC), TIMEX_UTC);
+    assert(strcmp(b1, b2) != 0);
+    // Extreme blob times: defined output, fits the buffer, no roundtrip.
+    Time extreme[] = {
+        {INT64_MAX, 0},
+        {INT64_MIN, 999999999},
+    };
+    for (size_t i = 0; i < sizeof(extreme) / sizeof(extreme[0]); i++) {
+        char buf[64];
+        size_t n = time_fmt_iso(buf, sizeof(buf), extreme[i], TIMEX_UTC);
+        assert(n < TIMEX_FMT_BUF_SIZE);
+        Time got = time_parse(buf);
+        assert(!time_equal(got, extreme[i]));
+    }
+    printf("OK\n");
+}
+
+// Negative sub-hour offsets must keep their sign (e.g. -30 minutes prints
+// "-00:30", not "+00:30"), and even full-range int offsets must stay within
+// the SQL-layer buffer size.
+static void test_fmt_offset(void) {
+    printf("test_fmt_offset...");
+    Time t = time_unix(0, 0);  // 1970-01-01T00:00:00Z
+    char buf[64];
+    struct {
+        int offset_sec;
+        const char* want;
+    } tests[] = {
+        {0, "1970-01-01T00:00:00Z"},
+        {3600, "1970-01-01T01:00:00+01:00"},
+        {-3600, "1969-12-31T23:00:00-01:00"},
+        {-1800, "1969-12-31T23:30:00-00:30"},
+        {-1799, "1969-12-31T23:30:01-00:29"},
+        // Sub-minute offsets lose the sign, as in Go: the offset prints as
+        // "+00:00" even though the time fields shift by the full offset.
+        {-59, "1969-12-31T23:59:01+00:00"},
+        {59, "1970-01-01T00:00:59+00:00"},
+        {330 * 60, "1970-01-01T05:30:00+05:30"},
+        {-(330 * 60), "1969-12-31T18:30:00-05:30"},
+        {14 * 3600, "1970-01-01T14:00:00+14:00"},
+        {-12 * 3600, "1969-12-31T12:00:00-12:00"},
+    };
+    for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        size_t n = time_fmt_iso(buf, sizeof(buf), t, tests[i].offset_sec);
+        assert(strcmp(buf, tests[i].want) == 0);
+        assert(n == strlen(tests[i].want));
+    }
+    // Full-range offsets: no UB, output fits the SQL-layer buffer.
+    int wild[] = {INT32_MAX, INT32_MIN, 596523 * 3600, -596523 * 3600};
+    for (size_t i = 0; i < sizeof(wild) / sizeof(wild[0]); i++) {
+        size_t n = time_fmt_iso(buf, sizeof(buf), t, wild[i]);
+        assert(n < TIMEX_FMT_BUF_SIZE);
+    }
+    printf("OK\n");
+}
+
+// Extreme time values must be safe to format and inspect.
+static void test_extreme_values(void) {
+    printf("test_extreme_values...");
+    Time extremes[] = {
+        {INT64_MAX, 0},
+        {INT64_MAX, 999999999},
+        {INT64_MIN, 0},
+        {INT64_MIN, 999999999},
+        {0, 0},
+        {-31622400, 0},  // 0000-01-01
+    };
+    for (size_t i = 0; i < sizeof(extremes) / sizeof(extremes[0]); i++) {
+        Time t = extremes[i];
+        char buf[64];
+        // Must fit the SQL-layer buffer.
+        assert(time_fmt_iso(buf, sizeof(buf), t, TIMEX_UTC) < TIMEX_FMT_BUF_SIZE);
+        assert(time_fmt_iso(buf, sizeof(buf), t, 5497) < TIMEX_FMT_BUF_SIZE);
+        assert(time_fmt_iso(buf, sizeof(buf), t, -4299) < TIMEX_FMT_BUF_SIZE);
+        assert(time_fmt_datetime(buf, sizeof(buf), t, TIMEX_UTC) < TIMEX_FMT_BUF_SIZE);
+        assert(time_fmt_date(buf, sizeof(buf), t, TIMEX_UTC) < TIMEX_FMT_BUF_SIZE);
+        assert(time_fmt_time(buf, sizeof(buf), t, TIMEX_UTC) < TIMEX_FMT_BUF_SIZE);
+        // Getters must not crash.
+        (void)time_get_year(t);
+        (void)time_get_yearday(t);
+        int year, week;
+        time_get_isoweek(t, &year, &week);
+        (void)time_to_milli(t);
+        (void)time_to_micro(t);
+        (void)time_to_nano(t);
+    }
+    // time_div with the minimum possible sec value.
+    Time tmin = {INT64_MIN, 0};
+    (void)time_truncate(tmin, Second);
+    (void)time_truncate(tmin, Hour);
+    (void)time_round(tmin, Second);
+    // time_sub at the extremes clamps to MIN/MAX_DURATION whenever the true
+    // difference does not fit into a Duration. Because time_add saturates, a
+    // wrapped candidate difference cannot reconstruct the input and sneak
+    // past the roundtrip check.
+    Time tmax = {INT64_MAX, 0};
+    Time tzero = {0, 0};
+    assert(time_sub(tmax, tzero) == MAX_DURATION);
+    assert(time_sub(tzero, tmax) == MIN_DURATION);
+    // Adversarial wrap pair: the naive difference wraps to exactly -1ns/+1ns,
+    // but time_add's saturation must make the roundtrip check fail.
+    assert(time_sub((Time){INT64_MAX, 999999999}, (Time){INT64_MIN, 0}) == MAX_DURATION);
+    assert(time_sub((Time){INT64_MIN, 0}, (Time){INT64_MAX, 999999999}) == MIN_DURATION);
+    // time_add saturates at the representable boundaries.
+    assert(time_equal(time_add((Time){INT64_MAX - 5, 0}, 10 * Second),
+                      (Time){INT64_MAX, 999999999}));
+    assert(time_equal(time_add((Time){INT64_MIN + 5, 0}, -10 * Second),
+                      (Time){INT64_MIN, 0}));
+    assert(time_equal(time_add((Time){INT64_MAX, 999999999}, 1),
+                      (Time){INT64_MAX, 999999999}));
+    assert(time_equal(time_add((Time){INT64_MIN, 0}, -1), (Time){INT64_MIN, 0}));
+    // Exact operations reaching INT64_MIN remain in range.
+    assert(time_equal(time_add((Time){INT64_MIN + 1, 0}, -Second), (Time){INT64_MIN, 0}));
+    assert(time_sub((Time){INT64_MIN, 0}, (Time){INT64_MIN + 1, 0}) == -Second);
+    // In-range arithmetic is unaffected by saturation.
+    assert(time_equal(time_add((Time){100, 999999999}, 2 * Second), (Time){102, 999999999}));
+    assert(time_sub((Time){102, 999999999}, (Time){100, 999999999}) == 2 * Second);
+    printf("OK\n");
+}
+
 #pragma endregion
 
 #pragma region Marshaling.
@@ -995,6 +1199,32 @@ static void test_marshal_blob(void) {
         // printf("want: {%lld %lld}, got: {%lld %lld}\n", want.sec, want.nsec, got.sec, got.nsec);
         assert(time_equal(got, want));
     }
+
+    // Times before year 1 have negative sec; the blob roundtrip must
+    // reproduce them exactly.
+    Time ancient[] = {
+        time_date(1, 1, 1, 0, 0, 0, 0, TIMEX_UTC),
+        time_date(0, 1, 1, 0, 0, 0, 0, TIMEX_UTC),
+        time_date(-400, 2, 29, 12, 30, 45, 123456789, TIMEX_UTC),
+        time_date(-10000, 12, 31, 23, 59, 59, 999999999, TIMEX_UTC),
+    };
+    for (size_t i = 0; i < sizeof(ancient) / sizeof(ancient[0]); i++) {
+        time_to_blob(ancient[i], buf);
+        Time got = time_blob(buf);
+        assert(time_equal(got, ancient[i]));
+    }
+
+    // Invalid blobs decode to the zero time: unknown version and
+    // out-of-range nanosecond field.
+    Time zero = {0, 0};
+    memset(buf, 0, TIMEX_BLOB_SIZE);  // version 0
+    assert(time_equal(time_blob(buf), zero));
+    memset(buf, 0xff, TIMEX_BLOB_SIZE);
+    buf[0] = 1;  // version 1, nsec = -1
+    assert(time_equal(time_blob(buf), zero));
+    time_to_blob(time_date(2024, 6, 15, 12, 0, 0, 0, TIMEX_UTC), buf);
+    buf[9] = 0x40;  // nsec = 0x40000000 > 999999999
+    assert(time_equal(time_blob(buf), zero));
     printf("OK\n");
 }
 
@@ -1008,6 +1238,7 @@ int main(void) {
     test_get_part();
     test_get_isoweek();
     test_get_yearday();
+    test_leap_day_boundary();
 
     // Unix time.
     test_unix();
@@ -1042,6 +1273,9 @@ int main(void) {
     test_fmt_date();
     test_fmt_time();
     test_parse();
+    test_fmt_parse_roundtrip();
+    test_fmt_offset();
+    test_extreme_values();
 
     // Marshaling.
     test_marshal_blob();
