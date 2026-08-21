@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include "time/common.h"
 #include "time/timex.h"
 
 // Some platforms do not support timespec_get() from time.h.
@@ -119,17 +120,8 @@ static bool is_leap(int64_t year) {
     return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 }
 
-// uint64_to_int64 interprets u modulo 2^64 as a signed 64-bit value.
-// Unlike a direct cast, this is fully defined when u > INT64_MAX.
-static int64_t uint64_to_int64(uint64_t u) {
-    if (u <= INT64_MAX) {
-        return (int64_t)u;
-    }
-    return -1 - (int64_t)(UINT64_MAX - u);
-}
-
-// uint32_to_int32 is the 32-bit equivalent used for calendar years returned
-// through the public int API.
+// uint32_to_int32 interprets u modulo 2^32 as a signed 32-bit value, used for
+// calendar years returned through the public int API.
 static int32_t uint32_to_int32(uint32_t u) {
     if (u <= INT32_MAX) {
         return (int32_t)u;

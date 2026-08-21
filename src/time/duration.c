@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
+#include "time/common.h"
 #include "time/timex.h"
 
 // Common durations.
@@ -60,15 +61,6 @@ double dur_to_hours(Duration d) {
 // assuming x and y are both positive (Duration is signed).
 static bool dless_than_half(Duration x, Duration y) {
     return (uint64_t)x + (uint64_t)x < (uint64_t)y;
-}
-
-// uint64_to_int64 interprets u modulo 2^64 as a signed 64-bit value.
-// Unlike a direct cast, this is fully defined when u > INT64_MAX.
-static int64_t uint64_to_int64(uint64_t u) {
-    if (u <= INT64_MAX) {
-        return (int64_t)u;
-    }
-    return -1 - (int64_t)(UINT64_MAX - u);
 }
 
 // dur_truncate returns the result of rounding d toward zero to a multiple of m.
