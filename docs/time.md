@@ -53,6 +53,22 @@ Duration is a 64-bit number of nanoseconds, so it can represent values up to abo
 
 The calendrical calculations always assume a Gregorian calendar, with no leap seconds.
 
+### NULL handling
+
+Time functions are strict: if any argument is `NULL`, the result is `NULL`. This
+holds in every argument position and is checked before argument types, so
+`time_add(NULL, 'not a duration')` and `time_add('not a time', NULL)` both return
+`NULL` instead of reporting the invalid argument. Functions that take no
+arguments, such as `time_now`, never return `NULL`.
+
+When no argument is `NULL`, results and type errors are unchanged.
+`time_get_year('2024-01-01')` fails, because a time value is a 13-byte blob
+rather than text.
+
+A `CHECK` constraint is satisfied when its expression is `NULL`, so
+`check (time_get_year(at) >= 2000)` does not reject a `NULL` value. Add
+`NOT NULL` to the column to require one.
+
 ## Creating time values
 
 There are two basic constructors — one for the current time and one for a specific date/time.
@@ -880,9 +896,10 @@ hold, as it always has. So `2011-02-30` is the same instant as `2011-03-02`,
 `+24:00` shifts by a day. A *malformed* zone is still rejected — `+0500` and
 `+05:xx` are not offsets.
 
-SQL `NULL` propagates. Other values return the zero time (year 1) if they do not
-parse, including when anything remains after the timestamp. The zero time is
-also a legal value, so a caller cannot tell it from a parse failure.
+`NULL` propagates, as everywhere else. Other values return the zero time
+(year 1) if they do not parse, including when anything remains after the
+timestamp. The zero time is also a legal value, so a caller cannot tell it from
+a parse failure.
 
 ```sql
 select time_parse('2011-11-18T15:56:35.666777888Z')      = time_unix(1321631795, 666777888);
