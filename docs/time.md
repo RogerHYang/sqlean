@@ -61,9 +61,8 @@ holds in every argument position and is checked before argument types, so
 `NULL` instead of reporting the invalid argument. Functions that take no
 arguments, such as `time_now`, never return `NULL`.
 
-When no argument is `NULL`, results and type errors are unchanged.
-`time_get_year('2024-01-01')` fails, because a time value is a 13-byte blob
-rather than text.
+`time_get_year` requires a 13-byte time blob. Passing text, such as
+`time_get_year('2024-01-01')`, reports an error.
 
 A `CHECK` constraint is satisfied when its expression is `NULL`, so
 `check (time_get_year(at) >= 2000)` does not reject a `NULL` value. Add
