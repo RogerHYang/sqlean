@@ -895,8 +895,8 @@ hold, as it always has. So `2011-02-30` is the same instant as `2011-03-02`,
 `+24:00` shifts by a day. A *malformed* zone is still rejected — `+0500` and
 `+05:xx` are not offsets.
 
-`NULL` propagates, as everywhere else. Other values return the zero time
-(year 1) if they do not parse, including when anything remains after the
+`time_parse(NULL)` returns `NULL`. A non-`NULL` value returns the zero time
+(year 1) if it does not parse, including when anything remains after the
 timestamp. The zero time is also a legal value, so a caller cannot tell it from
 a parse failure.
 
